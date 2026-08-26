@@ -7,7 +7,7 @@ export type { Todo };
 export default function TodoItem({ todo }: { todo: Todo }) {
   return (
     <li
-      className={`p-4 rounded border flex items-center justify-between gap-3 transition-colors ${
+      className={`p-4 rounded-2xl border flex items-center justify-between gap-3 transition-colors ${
         todo.completed ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
       }`}
     >
