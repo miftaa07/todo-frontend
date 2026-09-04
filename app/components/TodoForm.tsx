@@ -25,14 +25,15 @@ export default function TodoForm({ onAddTodo }: TodoFormProps) {
   }
 
   return (
-    <div className="mb-6 bg-gray-50 p-4 rounded-2xl border border-gray-100">
-      <form onSubmit={handleSubmit} className="flex gap-2">
+    <div className="mb-6">
+      <form onSubmit={handleSubmit} className="flex items-center gap-2">
         <Input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Tambahkan tugas baru..."
-          className="flex-1 text-gray-800 p-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          className="flex-1"
+          inputClassName="rounded-full border-gray-300 focus-visible:ring-primary-70"
           variantSize="md"
         />
         <Button
@@ -40,6 +41,7 @@ export default function TodoForm({ onAddTodo }: TodoFormProps) {
           disabled={!title.trim()}
           variant="default"
           size="md"
+          className="rounded-full shrink-0"
         >
           Tambah
         </Button>

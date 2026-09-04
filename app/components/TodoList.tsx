@@ -5,13 +5,13 @@ import TodoItem from './TodoItem';
 import { Todo } from '@/types/todo';
 
 type todoListProps = {
-    todo: Todo[];
+    todos: Todo[];
     onToggleTodo: (id: number) => void;
     onDeleteTodo: (id: number) => void;
 }
 
-export default function TodoList({ todo,onToggleTodo,onDeleteTodo }: todoListProps) {
-    if (todo.length === 0) {
+export default function TodoList({ todos,onToggleTodo,onDeleteTodo }: todoListProps) {
+    if (todos.length === 0) {
         return (
             <div className="text-center p-8 text-gray-500 border-2 border-dashed
                 border-gray-200 rounded-md">
@@ -25,12 +25,12 @@ export default function TodoList({ todo,onToggleTodo,onDeleteTodo }: todoListPro
         <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold text-gray-80">Daftar Tugas</h2>
         <span className="text-xs bg-gray-70 text-gray-600 px-2.5 py-1 rounded-full font-medium">
-            {todo.length} item
+            {todos.length} item
         </span>
         </div>
 
         <ul className="space-y-3">
-        {todo.map((todo) => (
+        {todos.map((todo) => (
             <TodoItem
             key={todo.id}
             todo={todo}
