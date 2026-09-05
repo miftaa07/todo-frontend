@@ -1,46 +1,53 @@
 "use client";
 
-import { useSyncExternalStore, useCallback } from "react";
-
-function subscribe(callback: () => void): () => void {
-    window.addEventListener("storage", callback);
-    window.addEventListener("local-storage-update", callback);
-
-    return () => {
-        window.removeEventListener("storage", callback);
-        window.removeEventListener("local-storage-update", callback);
-    };
-}
+import { useState, useEffect, useCallback } from "react";
 
 export function useLocalStorage<T>(key: string, initialValue: T) {
-    const getSnapshot = (): string => {
+    // State diinisialisasi dengan initialValue dulu (aman untuk SSR/hydration)
+    const [storedValue, setStoredValue] = useState<T>(initialValue);
+
+    // Setelah komponen mount di browser, baca dari localStorage
+    useEffect(() => {
         try {
             const item = window.localStorage.getItem(key);
-            return item !== null ? item : JSON.stringify(initialValue);
-        } catch {
-            return JSON.stringify(initialValue);
+            if (item !== null) {
+                setStoredValue(JSON.parse(item) as T);
+            }
+        } catch (error) {
+            console.warn(`Gagal membaca localStorage untuk key "${key}":`, error);
         }
-    };
+    }, [key]);
 
-    const getServerSnapshot = (): string => {
-        return JSON.stringify(initialValue);
-    };
-
-    // mengambil state dari external store (localStorage) secara tersinkronsasi
-    const rawValue = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-    const storedValue: T = JSON.parse(rawValue);
+    // Sinkronisasi antar-tab: dengarkan event "storage" dari tab lain
+    useEffect(() => {
+        const handleStorageEvent = (e: StorageEvent) => {
+            if (e.key === key) {
+                try {
+                    const newValue =
+                        e.newValue !== null
+                            ? (JSON.parse(e.newValue) as T)
+                            : initialValue;
+                    setStoredValue(newValue);
+                } catch {
+                    // abaikan jika JSON tidak valid
+                }
+            }
+        };
+        window.addEventListener("storage", handleStorageEvent);
+        return () => window.removeEventListener("storage", handleStorageEvent);
+    }, [key, initialValue]);
 
     const setValue = useCallback(
         (value: T | ((val: T) => T)) => {
             try {
-                const item = window.localStorage.getItem(key);
-                const current: T =
-                    item !== null ? JSON.parse(item) : initialValue;
-                const nextValue =
-                    value instanceof Function ? value(current) : value;
-                window.localStorage.setItem(key, JSON.stringify(nextValue));
-                // Memicu event agar useSyncExternalStore mengetahui adanya perubahan
-                window.dispatchEvent(new Event("local-storage-update"));
+                // Gunakan functional update agar selalu dapat nilai terbaru
+                setStoredValue((prev) => {
+                    const nextValue =
+                        value instanceof Function ? value(prev) : value;
+                    // Simpan ke localStorage
+                    window.localStorage.setItem(key, JSON.stringify(nextValue));
+                    return nextValue;
+                });
             } catch (error) {
                 console.warn(
                     `Gagal menyimpan ke localStorage untuk key "${key}":`,
@@ -48,7 +55,8 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
                 );
             }
         },
-        [key, initialValue]
+        [key]
     );
+
     return [storedValue, setValue] as const;
 }
