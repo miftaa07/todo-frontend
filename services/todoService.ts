@@ -1,50 +1,180 @@
-import { apiClient } from '@/services/api';
-import { ApiTodo, TodosApiResponse } from '@/types/api-todo';
+import { apiClient } from './api';
+import {
+    ApiTodo,
+    TodosApiResponse as DummyJsonTodosResponse
+} from '@/types/api-todo';
+
+export interface BackendTodo {
+    id: number;
+    todo: string;
+    completed: boolean;
+    userId?: number;
+}
+
+interface TodoApiRecord {
+    id: number;
+    task?: string;
+    todo?: string;
+    is_completed?: boolean | number;
+    completed?: boolean;
+    user_id?: number;
+    userId?: number;
+}
+
+export interface TodosResponse {
+    success: boolean;
+    message: string;
+    data: TodoApiRecord[];
+}
+
+export interface SingleTodoResponse {
+    success: boolean;
+    message: string;
+    data: TodoApiRecord;
+}
 
 export interface FetchTodosParams {
-  limit?: number;
-  skip?: number;
+    limit?: number;
+    skip?: number;
 }
 
 export interface CreateTodoInput {
-  todo: string;
-  completed: boolean;
-  userId: number;
+    todo: string;
+    completed?: boolean;
+    userId?: number;
+}
+
+function normalizeTodo(todo: TodoApiRecord): BackendTodo {
+    const title = todo.task ?? todo.todo;
+
+    if (typeof title !== 'string') {
+        throw new Error('Respons backend tidak berisi judul todo yang valid.');
+    }
+
+    return {
+        id: todo.id,
+        todo: title,
+        completed: Boolean(todo.is_completed ?? todo.completed),
+        userId: todo.user_id ?? todo.userId,
+    };
 }
 
 export const todoService = {
-  // Mengambil semua data todo
-  async fetchTodos(params: FetchTodosParams = { limit: 15, skip: 0 }): Promise<TodosApiResponse> {
-    const { limit = 15, skip = 0 } = params;
-    return apiClient<TodosApiResponse>(`/todos?limit=${limit}&skip=${skip}`
-    );
-  },
+    async getTodos(): Promise<BackendTodo[]> {
+        const res = await apiClient<TodosResponse>(
+            '/todos?perPage=50'
+        );
 
-  // Mengambil todo berdasarkan ID
-  async fetchTodoById(id: number | string): Promise<ApiTodo> {
-    return apiClient<ApiTodo>(`/todos/${id}`);
-  },
+        return res.data.map(normalizeTodo);
+    },
 
-  // Menambahkan todo baru
-  async createTodo(payload: CreateTodoInput): Promise<ApiTodo> {
-    return apiClient<ApiTodo>("/todos/add", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-  },
+    async getTodoById(
+        id: number | string
+    ): Promise<BackendTodo> {
+        const res = await apiClient<SingleTodoResponse>(
+            `/todos/${id}`
+        );
 
-  // Mengubah status todo
-  async updateTodoStatus(id: number | string, completed: boolean): Promise<ApiTodo> {
-    return apiClient<ApiTodo>(`/todos/${id}`, {
-      method: "PUT",
-      body: JSON.stringify({ completed }),
-    });
-  },
+        return normalizeTodo(res.data);
+    },
 
-  // Menghapus todo
-  async deleteTodo(id: number | string): Promise<{ id: number; isDeleted: boolean; deletedOn: string; }> {
-    return apiClient<{ id: number; isDeleted: boolean; deletedOn: string; }>(`/todos/${id}`, {
-      method: "DELETE",
-    });
-  },
+    async createTodo(
+        payload: string | CreateTodoInput
+    ): Promise<BackendTodo> {
+        const task =
+            typeof payload === 'string'
+                ? payload
+                : payload.todo;
+
+        const res = await apiClient<SingleTodoResponse>(
+            '/todos',
+            {
+                method: 'POST',
+                body: JSON.stringify({ task }),
+            }
+        );
+
+        return normalizeTodo(res.data);
+    },
+
+    async updateTodo(
+        id: number | string,
+        payload: {
+            task?: string;
+            is_completed?: boolean;
+        }
+    ): Promise<void> {
+        await apiClient(`/todos/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+        });
+    },
+
+    async deleteTodo(
+        id: number | string
+    ): Promise<void> {
+        await apiClient(`/todos/${id}`, {
+            method: 'DELETE',
+        });
+    },
+
+    async fetchTodos(
+        params: FetchTodosParams = {
+            limit: 15,
+            skip: 0,
+        }
+    ): Promise<DummyJsonTodosResponse> {
+        try {
+            const todos = await this.getTodos();
+
+            const mapped: ApiTodo[] = todos.map((t) => ({
+                id: t.id,
+                todo: t.todo,
+                completed: t.completed,
+                userId: 1,
+            }));
+
+            return {
+                todos: mapped,
+                total: mapped.length,
+                skip: params.skip || 0,
+                limit: params.limit || 15,
+            };
+        } catch {
+            return {
+                todos: [],
+                total: 0,
+                skip: 0,
+                limit: 15,
+            };
+        }
+    },
+
+    async fetchTodoById(
+        id: number | string
+    ): Promise<ApiTodo> {
+        const todo = await this.getTodoById(id);
+
+        return {
+            id: todo.id,
+            todo: todo.todo,
+            completed: todo.completed,
+            userId: 1,
+        };
+    },
+
+    async updateTodoStatus(
+        id: number | string,
+        completed: boolean
+    ): Promise<BackendTodo> {
+        await this.updateTodo(id, {
+            is_completed: completed,
+        });
+
+        return {
+            id: Number(id),
+            todo: '',
+            completed,
+        };
+    },
 };
